@@ -518,209 +518,212 @@ with tab9:
             data_source_label = f"⚡ **Data Sintetis Realistis (Fallback):** Kata kunci `{keyword}`"
     else:
         raw_df = get_raw_scraped_data(keyword)
-        data_source_label = f"⚡ **Data Sintetis Realistis:** Dihasilkan untuk kata kunci `{keyword}` ({len(raw_df):,} baris data)"
+        data_source_label = f"⚡ **Data Scraping Live:** Kata kunci `{keyword}` ({len(raw_df):,} baris data)"
 
-    st.markdown(
-        f"""
-        <div style="
-            background: rgba(99, 102, 241, 0.1);
-            border-left: 4px solid #6366f1;
-            padding: 10px 18px;
-            border-radius: 6px;
-            font-size: 13px;
-            margin-bottom: 12px;
-        ">
-            {data_source_label}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # ── Summary Metrics ───────────────────────────────────────────────────────
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1:
-        st.metric("Total Baris Data", f"{len(raw_df):,}")
-    with col_m2:
-        n_plat = raw_df["platform"].nunique() if "platform" in raw_df.columns else len(raw_df.columns)
-        st.metric("Jumlah Platform" if "platform" in raw_df.columns else "Total Kolom", f"{n_plat}")
-    with col_m3:
-        if "sentiment" in raw_df.columns:
-            pos_ratio = (raw_df["sentiment"].str.lower() == "positif").mean() * 100
-            st.metric("Rasio Sentimen Positif", f"{pos_ratio:.1f}%")
-        else:
-            st.metric("Kolom Terdeteksi", f"{len(raw_df.columns)}")
-    with col_m4:
-        total_eng = 0
-        for col_name in ["likes", "shares", "comments"]:
-            if col_name in raw_df.columns and pd.api.types.is_numeric_dtype(raw_df[col_name]):
-                total_eng += raw_df[col_name].sum()
-        st.metric("Total Engagement", f"{int(total_eng):,}")
-
-    st.markdown("---")
-
-    # ── Filter & Search Section ───────────────────────────────────────────────
-    st.markdown("##### :material/search: Filter & Pencarian Cepat")
-    # Menggunakan 3 kolom: Sentimen (1), Emosi (1), dan Cari Teks (2, lebih lebar)
-    f_col1, f_col2, f_col3 = st.columns([1, 1, 2])
-
-    df_filtered = raw_df.copy()
-
-    with f_col1:
-        if "sentiment" in raw_df.columns:
-            available_sentiments = ["Semua"] + sorted(list(raw_df["sentiment"].dropna().astype(str).unique()))
-            selected_sentiment = st.selectbox(
-                "Sentimen",
-                options=available_sentiments,
-                index=0,
-                key="filter_raw_sentiment",
-            )
-            if selected_sentiment != "Semua":
-                df_filtered = df_filtered[df_filtered["sentiment"] == selected_sentiment]
-
-    with f_col2:
-        if "emotion" in raw_df.columns:
-            available_emotions = ["Semua"] + sorted(list(raw_df["emotion"].dropna().astype(str).unique()))
-            selected_emotion = st.selectbox(
-                "Emosi",
-                options=available_emotions,
-                index=0,
-                key="filter_raw_emotion",
-            )
-            if selected_emotion != "Semua":
-                df_filtered = df_filtered[df_filtered["emotion"] == selected_emotion]
-
-    with f_col3:
-        search_query = st.text_input(
-            "Cari Teks / Konten",
-            placeholder="Ketik kata kunci untuk mencari di dalam tabel...",
-            key="filter_raw_search",
+    if raw_df.empty:
+        st.warning("tidak ada data yang berhasil di tampilkan dari hasil scraping ataupun disambungkan ke API", icon="⚠️")
+    else:
+        st.markdown(
+            f"""
+            <div style="
+                background: rgba(99, 102, 241, 0.1);
+                border-left: 4px solid #6366f1;
+                padding: 10px 18px;
+                border-radius: 6px;
+                font-size: 13px;
+                margin-bottom: 12px;
+            ">
+                {data_source_label}
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        if search_query:
-            # Cari di kolom string manapun (content, text, author, dll.)
-            text_cols = [c for c in df_filtered.columns if df_filtered[c].dtype == object]
-            if text_cols:
-                mask = df_filtered[text_cols].apply(
-                    lambda col: col.astype(str).str.contains(search_query, case=False, na=False)
-                ).any(axis=1)
-                df_filtered = df_filtered[mask]
 
-    # ── Separate Tabs Per Platform ────────────────────────────────────────────
-    if "raw_data_pages" not in st.session_state:
-        st.session_state.raw_data_pages = {}
+        # ── Summary Metrics ───────────────────────────────────────────────────────
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        with col_m1:
+            st.metric("Total Baris Data", f"{len(raw_df):,}")
+        with col_m2:
+            n_plat = raw_df["platform"].nunique() if "platform" in raw_df.columns else len(raw_df.columns)
+            st.metric("Jumlah Platform" if "platform" in raw_df.columns else "Total Kolom", f"{n_plat}")
+        with col_m3:
+            if "sentiment" in raw_df.columns:
+                pos_ratio = (raw_df["sentiment"].str.lower() == "positif").mean() * 100
+                st.metric("Rasio Sentimen Positif", f"{pos_ratio:.1f}%")
+            else:
+                st.metric("Kolom Terdeteksi", f"{len(raw_df.columns)}")
+        with col_m4:
+            total_eng = 0
+            for col_name in ["likes", "shares", "comments"]:
+                if col_name in raw_df.columns and pd.api.types.is_numeric_dtype(raw_df[col_name]):
+                    total_eng += raw_df[col_name].sum()
+            st.metric("Total Engagement", f"{int(total_eng):,}")
 
-    platforms_in_data = sorted(list(df_filtered["platform"].dropna().astype(str).unique())) if "platform" in df_filtered.columns else ["Data"]
+        st.markdown("---")
+
+        # ── Filter & Search Section ───────────────────────────────────────────────
+        st.markdown("##### :material/search: Filter & Pencarian Cepat")
+        # Menggunakan 3 kolom: Sentimen (1), Emosi (1), dan Cari Teks (2, lebih lebar)
+        f_col1, f_col2, f_col3 = st.columns([1, 1, 2])
+
+        df_filtered = raw_df.copy()
+
+        with f_col1:
+            if "sentiment" in raw_df.columns:
+                available_sentiments = ["Semua"] + sorted(list(raw_df["sentiment"].dropna().astype(str).unique()))
+                selected_sentiment = st.selectbox(
+                    "Sentimen",
+                    options=available_sentiments,
+                    index=0,
+                    key="filter_raw_sentiment",
+                )
+                if selected_sentiment != "Semua":
+                    df_filtered = df_filtered[df_filtered["sentiment"] == selected_sentiment]
+
+        with f_col2:
+            if "emotion" in raw_df.columns:
+                available_emotions = ["Semua"] + sorted(list(raw_df["emotion"].dropna().astype(str).unique()))
+                selected_emotion = st.selectbox(
+                    "Emosi",
+                    options=available_emotions,
+                    index=0,
+                    key="filter_raw_emotion",
+                )
+                if selected_emotion != "Semua":
+                    df_filtered = df_filtered[df_filtered["emotion"] == selected_emotion]
+
+        with f_col3:
+            search_query = st.text_input(
+                "Cari Teks / Konten",
+                placeholder="Ketik kata kunci untuk mencari di dalam tabel...",
+                key="filter_raw_search",
+            )
+            if search_query:
+                # Cari di kolom string manapun (content, text, author, dll.)
+                text_cols = [c for c in df_filtered.columns if df_filtered[c].dtype == object]
+                if text_cols:
+                    mask = df_filtered[text_cols].apply(
+                        lambda col: col.astype(str).str.contains(search_query, case=False, na=False)
+                    ).any(axis=1)
+                    df_filtered = df_filtered[mask]
+
+        # ── Separate Tabs Per Platform ────────────────────────────────────────────
+        if "raw_data_pages" not in st.session_state:
+            st.session_state.raw_data_pages = {}
+
+        platforms_in_data = sorted(list(df_filtered["platform"].dropna().astype(str).unique())) if "platform" in df_filtered.columns else ["Data"]
     
-    tabs = st.tabs([f"{p}" for p in platforms_in_data])
+        tabs = st.tabs([f"{p}" for p in platforms_in_data])
     
-    for i, plat in enumerate(platforms_in_data):
-        with tabs[i]:
-            df_plat = df_filtered[df_filtered["platform"] == plat] if "platform" in df_filtered.columns else df_filtered
+        for i, plat in enumerate(platforms_in_data):
+            with tabs[i]:
+                df_plat = df_filtered[df_filtered["platform"] == plat] if "platform" in df_filtered.columns else df_filtered
             
-            # Fallback jika data lama (cache) masih mengandung 'shares' alih-alih 'views'
-            if plat == "YouTube" and "shares" in df_plat.columns:
-                df_plat = df_plat.rename(columns={"shares": "views"})
+                # Fallback jika data lama (cache) masih mengandung 'shares' alih-alih 'views'
+                if plat == "YouTube" and "shares" in df_plat.columns:
+                    df_plat = df_plat.rename(columns={"shares": "views"})
                 
-            # Hapus kolom yang semuanya NaN/kosong untuk platform ini (agar beda field)
-            df_plat = df_plat.dropna(axis=1, how='all')
+                # Hapus kolom yang semuanya NaN/kosong untuk platform ini (agar beda field)
+                df_plat = df_plat.dropna(axis=1, how='all')
             
-            # Reset index agar tabel mulai dari 1, bukan dari index aslinya (misal 50)
-            df_plat = df_plat.reset_index(drop=True)
-            df_plat.index = df_plat.index + 1
+                # Reset index agar tabel mulai dari 1, bukan dari index aslinya (misal 50)
+                df_plat = df_plat.reset_index(drop=True)
+                df_plat.index = df_plat.index + 1
             
-            # Pagination setup
-            page_key = f"page_raw_{plat}"
-            if page_key not in st.session_state.raw_data_pages:
-                st.session_state.raw_data_pages[page_key] = 1
+                # Pagination setup
+                page_key = f"page_raw_{plat}"
+                if page_key not in st.session_state.raw_data_pages:
+                    st.session_state.raw_data_pages[page_key] = 1
                 
-            items_per_page = 15
-            total_pages = (len(df_plat) - 1) // items_per_page + 1 if len(df_plat) > 0 else 1
+                items_per_page = 15
+                total_pages = (len(df_plat) - 1) // items_per_page + 1 if len(df_plat) > 0 else 1
             
-            if st.session_state.raw_data_pages[page_key] > total_pages:
-                st.session_state.raw_data_pages[page_key] = max(1, total_pages)
+                if st.session_state.raw_data_pages[page_key] > total_pages:
+                    st.session_state.raw_data_pages[page_key] = max(1, total_pages)
                 
-            current_page = st.session_state.raw_data_pages[page_key]
-            start_idx = (current_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            df_page = df_plat.iloc[start_idx:end_idx]
+                current_page = st.session_state.raw_data_pages[page_key]
+                start_idx = (current_page - 1) * items_per_page
+                end_idx = start_idx + items_per_page
+                df_page = df_plat.iloc[start_idx:end_idx]
             
-            st.markdown(f"Menampilkan **{start_idx + 1}** - **{min(end_idx, len(df_plat))}** dari **{len(df_plat):,}** baris data pada platform {plat}:")
+                st.markdown(f"Menampilkan **{start_idx + 1}** - **{min(end_idx, len(df_plat))}** dari **{len(df_plat):,}** baris data pada platform {plat}:")
             
-            column_config = {}
-            if "url" in df_page.columns:
-                column_config["url"] = st.column_config.LinkColumn("Tautan", display_text="Buka Link")
-            if "likes" in df_page.columns:
-                column_config["likes"] = st.column_config.NumberColumn("Likes", format="%d")
-            if "views" in df_page.columns:
-                column_config["views"] = st.column_config.NumberColumn("Views", format="%d")
-            if "shares" in df_page.columns:
-                column_config["shares"] = st.column_config.NumberColumn("Shares", format="%d")
-            if "comments" in df_page.columns:
-                column_config["comments"] = st.column_config.NumberColumn("Comments", format="%d")
+                column_config = {}
+                if "url" in df_page.columns:
+                    column_config["url"] = st.column_config.LinkColumn("Tautan", display_text="Buka Link")
+                if "likes" in df_page.columns:
+                    column_config["likes"] = st.column_config.NumberColumn("Likes", format="%d")
+                if "views" in df_page.columns:
+                    column_config["views"] = st.column_config.NumberColumn("Views", format="%d")
+                if "shares" in df_page.columns:
+                    column_config["shares"] = st.column_config.NumberColumn("Shares", format="%d")
+                if "comments" in df_page.columns:
+                    column_config["comments"] = st.column_config.NumberColumn("Comments", format="%d")
                 
-            st.dataframe(
-                df_page,
+                st.dataframe(
+                    df_page,
+                    use_container_width=True,
+                    column_config=column_config,
+                    height=480,
+                )
+            
+                # Pagination Buttons Bottom
+                st.write("")
+                def make_set_page(pk):
+                    def set_page(page_num):
+                        st.session_state.raw_data_pages[pk] = page_num
+                    return set_page
+            
+                set_page_cb = make_set_page(page_key)
+            
+                window_start = max(1, current_page - 2)
+                window_end = min(total_pages, window_start + 4)
+                if window_end - window_start < 4:
+                    window_start = max(1, window_end - 4)
+                pages_to_show = list(range(window_start, window_end + 1))
+            
+                cols = st.columns([1.5, 1, 1, 1, 1, 1, 1.5])
+                with cols[0]:
+                    if current_page > 1:
+                        st.button(":material/arrow_back: Prev", on_click=set_page_cb, args=(current_page - 1,), key=f"prev_{plat}", use_container_width=True)
+                for j, p in enumerate(pages_to_show):
+                    with cols[j + 1]:
+                        st.button(str(p), on_click=set_page_cb, args=(p,), type="primary" if p == current_page else "secondary", key=f"page_{plat}_{p}", use_container_width=True)
+                with cols[6]:
+                    if current_page < total_pages:
+                        st.button("Next :material/arrow_forward:", on_click=set_page_cb, args=(current_page + 1,), key=f"next_{plat}", use_container_width=True)
+
+        # ── Export Button ─────────────────────────────────────────────────────────
+        c_btn1, c_btn2 = st.columns([2, 5])
+        with c_btn1:
+            csv_bytes = df_filtered.to_csv(index=False).encode("utf-8")
+            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
+            st.download_button(
+                label=":material/download: Unduh Data Terfilter (CSV)",
+                data=csv_bytes,
+                file_name=f"raw_data_{keyword}_{timestamp_str}.csv",
+                mime="text/csv",
                 use_container_width=True,
-                column_config=column_config,
-                height=480,
             )
-            
-            # Pagination Buttons Bottom
-            st.write("")
-            def make_set_page(pk):
-                def set_page(page_num):
-                    st.session_state.raw_data_pages[pk] = page_num
-                return set_page
-            
-            set_page_cb = make_set_page(page_key)
-            
-            window_start = max(1, current_page - 2)
-            window_end = min(total_pages, window_start + 4)
-            if window_end - window_start < 4:
-                window_start = max(1, window_end - 4)
-            pages_to_show = list(range(window_start, window_end + 1))
-            
-            cols = st.columns([1.5, 1, 1, 1, 1, 1, 1.5])
-            with cols[0]:
-                if current_page > 1:
-                    st.button(":material/arrow_back: Prev", on_click=set_page_cb, args=(current_page - 1,), key=f"prev_{plat}", use_container_width=True)
-            for j, p in enumerate(pages_to_show):
-                with cols[j + 1]:
-                    st.button(str(p), on_click=set_page_cb, args=(p,), type="primary" if p == current_page else "secondary", key=f"page_{plat}_{p}", use_container_width=True)
-            with cols[6]:
-                if current_page < total_pages:
-                    st.button("Next :material/arrow_forward:", on_click=set_page_cb, args=(current_page + 1,), key=f"next_{plat}", use_container_width=True)
 
-    # ── Export Button ─────────────────────────────────────────────────────────
-    c_btn1, c_btn2 = st.columns([2, 5])
-    with c_btn1:
-        csv_bytes = df_filtered.to_csv(index=False).encode("utf-8")
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
-        st.download_button(
-            label=":material/download: Unduh Data Terfilter (CSV)",
-            data=csv_bytes,
-            file_name=f"raw_data_{keyword}_{timestamp_str}.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-    # ── Quick Post Inspector ──────────────────────────────────────────────────
-    content_col = "content" if "content" in df_filtered.columns else "text" if "text" in df_filtered.columns else None
-    if not df_filtered.empty and content_col:
-        with st.expander(":material/search: Inspeksi Detail Satu Postingan", expanded=False):
-            sample_indices = df_filtered.index.tolist()[:100]
-            selected_idx = st.selectbox(
-                "Pilih baris untuk melihat isi lengkap:",
-                options=sample_indices,
-                format_func=lambda idx: f"[{df_filtered.loc[idx, 'platform'] if 'platform' in df_filtered.columns else '-'}] {str(df_filtered.loc[idx, 'author'] if 'author' in df_filtered.columns else 'User')} - {str(df_filtered.loc[idx, content_col])[:45]}...",
-            )
-            if selected_idx is not None:
-                item = df_filtered.loc[selected_idx]
-                st.markdown(f"**Platform:** `{item.get('platform', '-')}` | **Penulis:** `{item.get('author', '-')} ({item.get('handle', '-')})` | **Waktu:** `{item.get('created_at', '-')}`")
-                if "sentiment" in item or "emotion" in item:
-                    st.markdown(f"**Sentimen:** `{item.get('sentiment', '-')}` | **Emosi:** `{item.get('emotion', '-')}`")
-                st.info(item.get(content_col, ""))
-                if "likes" in item or "shares" in item or "comments" in item:
-                    st.caption(f":material/favorite: Likes: {item.get('likes', 0):,} | :material/share: Shares: {item.get('shares', 0):,} | :material/comment: Comments: {item.get('comments', 0):,}")
+        # ── Quick Post Inspector ──────────────────────────────────────────────────
+        content_col = "content" if "content" in df_filtered.columns else "text" if "text" in df_filtered.columns else None
+        if not df_filtered.empty and content_col:
+            with st.expander(":material/search: Inspeksi Detail Satu Postingan", expanded=False):
+                sample_indices = df_filtered.index.tolist()[:100]
+                selected_idx = st.selectbox(
+                    "Pilih baris untuk melihat isi lengkap:",
+                    options=sample_indices,
+                    format_func=lambda idx: f"[{df_filtered.loc[idx, 'platform'] if 'platform' in df_filtered.columns else '-'}] {str(df_filtered.loc[idx, 'author'] if 'author' in df_filtered.columns else 'User')} - {str(df_filtered.loc[idx, content_col])[:45]}...",
+                )
+                if selected_idx is not None:
+                    item = df_filtered.loc[selected_idx]
+                    st.markdown(f"**Platform:** `{item.get('platform', '-')}` | **Penulis:** `{item.get('author', '-')} ({item.get('handle', '-')})` | **Waktu:** `{item.get('created_at', '-')}`")
+                    if "sentiment" in item or "emotion" in item:
+                        st.markdown(f"**Sentimen:** `{item.get('sentiment', '-')}` | **Emosi:** `{item.get('emotion', '-')}`")
+                    st.info(item.get(content_col, ""))
+                    if "likes" in item or "shares" in item or "comments" in item:
+                        st.caption(f":material/favorite: Likes: {item.get('likes', 0):,} | :material/share: Shares: {item.get('shares', 0):,} | :material/comment: Comments: {item.get('comments', 0):,}")
 
 
 # ══════════════════════════════════════════════════════════════════════════╗
@@ -729,12 +732,12 @@ with tab9:
 
 st.markdown("---")
 st.markdown(
-    """
-    <div style="text-align:center; color:#64748b; font-size:12px; padding:12px 0;">
-        <b>PoC Dashboard Sentimen & SNA Lintas Platform</b><br>
-        Tugas Akhir · S1 Teknik Informatika · Data yang ditampilkan adalah data sintetis untuk keperluan proof-of-concept.<br>
-        Dibangun dengan Streamlit + Plotly + Pyvis + WordCloud
-    </div>
-    """,
-    unsafe_allow_html=True,
+        """
+        <div style="text-align:center; color:#64748b; font-size:12px; padding:12px 0;">
+            <b>PoC Dashboard Sentimen & SNA Lintas Platform</b><br>
+            Tugas Akhir · S1 Teknik Informatika · Data yang ditampilkan adalah data sintetis untuk keperluan proof-of-concept.<br>
+            Dibangun dengan Streamlit + Plotly + Pyvis + WordCloud
+        </div>
+        """,
+        unsafe_allow_html=True,
 )

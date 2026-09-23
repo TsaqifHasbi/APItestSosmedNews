@@ -815,39 +815,6 @@ def get_raw_scraped_data(keyword: str, n_rows: int = 150) -> pd.DataFrame:
     threads_data = fetch_threads_data(keyword, max_results=max_per_platform)
     instagram_data = fetch_instagram_data(keyword, max_results=max_per_platform)
     
-    # Fallback Data Sintetis Threads jika API Key belum disiapkan
-    import uuid
-    from datetime import datetime, timedelta
-    if not threads_data:
-        for i in range(max_per_platform):
-            threads_data.append({
-                "post_id": f"TH-{uuid.uuid4().hex[:8]}",
-                "platform": "Threads",
-                "author": f"user_threads_{i+1}",
-                "handle": f"@user_threads_{i+1}",
-                "created_at": (datetime.now() - timedelta(hours=i*2)).strftime("%Y-%m-%d %H:%M"),
-                "content": f"Opini mengenai {keyword}: Saya merasa ini adalah langkah yang sangat penting! 🔥 #Diskusi",
-                "url": f"https://www.threads.net/t/{uuid.uuid4().hex[:11]}",
-                "likes": random.randint(10, 1000),
-                "reposts": random.randint(0, 300),
-                "replies": random.randint(5, 500)
-            })
-
-    # Fallback Data Sintetis Instagram jika API Key belum disiapkan
-    if not instagram_data:
-        for i in range(max_per_platform):
-            instagram_data.append({
-                "post_id": f"IG-{uuid.uuid4().hex[:8]}",
-                "platform": "Instagram",
-                "author": f"ig_user_{i+1}",
-                "handle": f"@ig_user_{i+1}",
-                "created_at": (datetime.now() - timedelta(hours=i*3)).strftime("%Y-%m-%d %H:%M"),
-                "content": f"Membahas {keyword} hari ini. Bagaimana menurut kalian? Tulis di komentar ya! 👇 #{keyword.replace(' ', '')}",
-                "url": f"https://www.instagram.com/p/{uuid.uuid4().hex[:11]}/",
-                "likes": random.randint(50, 5000),
-                "comments": random.randint(5, 800)
-            })
-
     combined = youtube_data + news_data + threads_data + instagram_data
     
     if not combined:
